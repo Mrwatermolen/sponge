@@ -1,3 +1,4 @@
+#include "address.hh"
 #include "socket.hh"
 #include "util.hh"
 
@@ -17,8 +18,18 @@ void get_URL(const string &host, const string &path) {
     // (not just one call to read() -- everything) until you reach
     // the "eof" (end of file).
 
-    cerr << "Function called: get_URL(" << host << ", " << path << ").\n";
-    cerr << "Warning: get_URL() has not been implemented yet.\n";
+    TCPSocket socket;
+    socket.connect(Address(host, "http"));
+
+    socket.write("GET " + path + " HTTP/1.1\r\n");  // This tells the server the path part of the URL
+    socket.write("Host: " + host + "\r\n");         //  This tells the server the host part of the URL.
+    socket.write("Connection: close\r\n");  // This tells the server that you are finished making requests, and it
+                                            // should close the connection as soon as it finishes replying.
+    socket.write("\r\n");  // This sends an empty line and tells the server that you are done with your HTTP request.
+    while (!socket.eof()) {
+        cout << socket.read();
+    }
+    socket.close();
 }
 
 int main(int argc, char *argv[]) {
