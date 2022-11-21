@@ -3,7 +3,10 @@
 
 #include "byte_stream.hh"
 
+#include <cstddef>
 #include <cstdint>
+#include <iostream>
+#include <map>
 #include <string>
 
 //! \brief A class that assembles a series of excerpts from a byte stream (possibly out of order,
@@ -12,8 +15,15 @@ class StreamReassembler {
   private:
     // Your code here -- add private members as necessary.
 
-    ByteStream _output;  //!< The reassembled in-order byte stream
-    size_t _capacity;    //!< The maximum number of bytes
+    ByteStream _output;       //!< The reassembled in-order byte stream
+    size_t _capacity;         //!< The maximum number of bytes
+    size_t _reassembled_len;  //<! The length of string has been reassembled.
+    bool _get_eof;
+    size_t _eof_index;  //<! we get eof
+    std::map<size_t, std::string> _unreassembled_data;
+
+    void meger_str(const std::string &data, const size_t index);
+    void write_data_to_byte_stream();
 
   public:
     //! \brief Construct a `StreamReassembler` that will store up to `capacity` bytes.
