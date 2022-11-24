@@ -6,7 +6,11 @@
 #include "tcp_segment.hh"
 #include "wrapping_integers.hh"
 
+#include <cstddef>
+#include <iostream>
 #include <optional>
+
+enum class TCPReceiverState { Listening, Receiving, WaitFinish };
 
 //! \brief The "receiver" part of a TCP implementation.
 
@@ -19,13 +23,18 @@ class TCPReceiver {
 
     //! The maximum number of bytes we'll store.
     size_t _capacity;
+    TCPReceiverState _state;
+    WrappingInt32 _isn;
+
+    void trans_receiving_state(const TCPSegment &seg);
+    void handle_payload(const TCPSegment &seg);
 
   public:
     //! \brief Construct a TCP receiver
     //!
     //! \param capacity the maximum number of bytes that the receiver will
     //!                 store in its buffers at any give time.
-    TCPReceiver(const size_t capacity) : _reassembler(capacity), _capacity(capacity) {}
+    TCPReceiver(const size_t capacity);
 
     //! \name Accessors to provide feedback to the remote TCPSender
     //!@{

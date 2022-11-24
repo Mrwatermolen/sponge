@@ -1,9 +1,5 @@
 #include "wrapping_integers.hh"
 
-#include <cstdint>
-#include <cstdlib>
-#include <iostream>
-
 // Dummy implementation of a 32-bit wrapping integer
 
 // For Lab 2, please replace with a real implementation that passes the
