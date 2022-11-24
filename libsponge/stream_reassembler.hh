@@ -18,8 +18,7 @@ class StreamReassembler {
     ByteStream _output;       //!< The reassembled in-order byte stream
     size_t _capacity;         //!< The maximum number of bytes
     size_t _reassembled_len;  //<! The length of string has been reassembled.
-    bool _get_eof;
-    size_t _eof_index;  //<! we get eof
+    size_t _eof_index;        //<! The index of input end
     std::map<size_t, std::string> _unreassembled_data;
 
     void meger_str(const std::string &data, const size_t index);
@@ -56,6 +55,13 @@ class StreamReassembler {
     //! \brief Is the internal state empty (other than the output stream)?
     //! \returns `true` if no substrings are waiting to be assembled
     bool empty() const;
+
+    /**
+     * @brief The number of bytes has been reassembled.
+     *
+     * @return size_t
+     */
+    inline size_t reassembled_bytes() const { return _reassembled_len; };
 };
 
 #endif  // SPONGE_LIBSPONGE_STREAM_REASSEMBLER_HH

@@ -21,8 +21,7 @@ StreamReassembler::StreamReassembler(const size_t capacity)
     : _output(capacity)
     , _capacity(capacity)
     , _reassembled_len(0)
-    , _get_eof(false)
-    , _eof_index(0)
+    , _eof_index(-1)
     , _unreassembled_data(map<size_t, std::string>()){};
 
 void StreamReassembler::meger_str(const string &data, const size_t index) {
@@ -84,16 +83,15 @@ void StreamReassembler::write_data_to_byte_stream() {
 //! contiguous substrings and writes them into the output stream in order.
 void StreamReassembler::push_substring(const string &data, const size_t index, const bool eof) {
     DUMMY_CODE(data, index, eof);
-    if (_get_eof && (_eof_index + 1 == _reassembled_len && _unreassembled_data.empty())) {
+    if (_eof_index == _reassembled_len) {
         return;
     }
 
     string s = data;
     size_t i = index;
 
-    if (eof && !_get_eof) {
-        _get_eof = true;
-        _eof_index = i + s.size() - 1;
+    if (eof) {
+        _eof_index = i + s.size();
     }
 
     // check deuplicate
@@ -127,7 +125,7 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
 
     write_data_to_byte_stream();
 
-    if (_get_eof && _eof_index + 1 == _reassembled_len && _unreassembled_data.empty()) {
+    if (_eof_index == _reassembled_len) {
         _output.end_input();
     }
 }
