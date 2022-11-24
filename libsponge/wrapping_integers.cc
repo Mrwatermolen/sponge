@@ -15,8 +15,8 @@ using namespace std;
 //! \param isn The initial sequence number
 WrappingInt32 wrap(uint64_t n, WrappingInt32 isn) {
     DUMMY_CODE(n, isn);
-    uint64_t base = uint64_t(UINT32_MAX) + 1;
-    uint32_t seqno = uint32_t((n + (isn.raw_value())) % base);
+    uint64_t base = static_cast<uint64_t>(UINT32_MAX) + 1;
+    uint32_t seqno = static_cast<uint32_t>((n + (isn.raw_value())) % base);
     return WrappingInt32{seqno};
 }
 
@@ -36,9 +36,9 @@ uint64_t unwrap(WrappingInt32 n, WrappingInt32 isn, uint64_t checkpoint) {
     WrappingInt32 &&c_seqno = wrap(checkpoint, isn);
     uint64_t n_abs_seqno = 0;
     auto offset = n - c_seqno;
-    auto abs_offset = uint64_t(abs(offset));
+    auto abs_offset = static_cast<uint64_t>(abs(offset));
     if (checkpoint < abs_offset) {
-        n_abs_seqno = uint32_t(checkpoint) + offset;
+        n_abs_seqno = static_cast<uint32_t>(checkpoint) + offset;
     } else {
         n_abs_seqno = checkpoint + offset;
     }
