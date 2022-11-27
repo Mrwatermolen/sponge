@@ -40,7 +40,6 @@ class TCPSender {
     uint64_t _next_seqno{0};
     uint64_t _last_ack_received{0};
     uint64_t _sender_window_size{1};
-    uint64_t _outstanding_bytes{0};
     std::deque<std::pair<TCPSegment, uint64_t>> _out_backup{};
     bool _get_fin{false};
     bool _send_fin{false};

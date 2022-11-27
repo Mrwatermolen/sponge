@@ -46,7 +46,6 @@ void TCPSender::fill_window() {
         uint64_t nums = min(TCPConfig::MAX_PAYLOAD_SIZE, (temp_size - outstanding_bytes));
         auto payload = Buffer(_stream.read(nums));
         if (!_next_seqno) {
-            // nums -= 1;
             seg.header().syn = true;
         }
         if (_stream.eof()) {
@@ -97,8 +96,7 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
     cur_state_to_srting();
 
     auto l = unwrap(ackno, _isn, _next_seqno);
-    auto r = l + window_size;
-    cout << "l:" << l << ". r:" << r << endl;
+    cout << "l:" << l << ". r:" << l + window_size << endl;
     if (_next_seqno < l) {
         cout << "F:ack_received() End. _next_seqno < l" << endl;
         return;
@@ -175,9 +173,9 @@ void TCPSender::send_empty_segment() {
 
 void TCPSender::cur_state_to_srting() const {
     cout << "Currant State:"
-         << " _isn: " << _isn << ". queue.size: " << _segments_out.size()
+         << " _isn: " << _isn << ". segments_queue.size: " << _segments_out.size()
          << ". _stream.buffer_size:" << _stream.buffer_size() << ". _next_seqno:" << _next_seqno
-         << ". LAR:" << _last_ack_received << ". SWS:" << _sender_window_size << ". outing_bytes:" << _outstanding_bytes
+         << ". LAR:" << _last_ack_received << ". SWS:" << _sender_window_size
          << ". outing_queue: " << _out_backup.size() << ". timepass:" << _time_pass << ". eof:" << _stream.eof()
          << endl;
 }
