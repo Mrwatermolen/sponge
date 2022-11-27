@@ -10,7 +10,7 @@
 #include <iostream>
 #include <optional>
 
-enum class TCPReceiverState { Listening, Receiving, WaitFinish };
+enum class TCPReceiverState { Listening, Receiving, CloseWait };
 
 //! \brief The "receiver" part of a TCP implementation.
 

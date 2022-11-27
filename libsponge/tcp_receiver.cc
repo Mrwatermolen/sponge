@@ -20,6 +20,11 @@ void TCPReceiver::segment_received(const TCPSegment &seg) {
             handle_payload(seg);
             break;
         }
+        case TCPReceiverState::CloseWait: {
+            // TODO
+            // I suppose its job isn't to manage the transitions.I may refactor this code in future.
+            break;
+        }
         default: {
             break;
         }
@@ -32,7 +37,7 @@ optional<WrappingInt32> TCPReceiver::ackno() const {
         return std::nullopt;
     }
     // abs_seq includes Include SYN/FIN,
-    if (_state == TCPReceiverState::WaitFinish) {
+    if (_state == TCPReceiverState::CloseWait) {
         // Receiver gets Fin signal and receives all segments safely.
         // So ACK = abs_seq + 1
         return wrap(_reassembler.reassembled_bytes() + 2, _isn);
@@ -83,6 +88,6 @@ void TCPReceiver::handle_payload(const TCPSegment &seg) {
 
     _reassembler.push_substring(seg.payload().copy(), stream_index, header.fin);
     if (_reassembler.stream_out().input_ended()) {
-        _state = TCPReceiverState::WaitFinish;
+        _state = TCPReceiverState::CloseWait;
     }
 }

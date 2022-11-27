@@ -6,8 +6,12 @@
 #include "tcp_segment.hh"
 #include "wrapping_integers.hh"
 
+#include <cstdint>
+#include <deque>
 #include <functional>
 #include <queue>
+
+enum class TCPSenderState { Closed, Listening, Receiving, CloseWait };
 
 //! \brief The "sender" part of a TCP implementation.
 
@@ -25,12 +29,27 @@ class TCPSender {
 
     //! retransmission timer for the connection
     unsigned int _initial_retransmission_timeout;
+    unsigned int _consecutive_retransmissions{0};
+    uint64_t _RTO;
+    uint64_t _time_pass{0};
 
     //! outgoing stream of bytes that have not yet been sent
     ByteStream _stream;
 
     //! the (absolute) sequence number for the next byte to be sent
     uint64_t _next_seqno{0};
+    uint64_t _last_ack_received{0};
+    uint64_t _sender_window_size{1};
+    uint64_t _outstanding_bytes{0};
+    std::deque<std::pair<TCPSegment, uint64_t>> _out_backup{};
+    bool _get_fin{false};
+    bool _send_fin{false};
+
+    /**
+     * @brief For Debug.
+     *
+     */
+    void cur_state_to_srting() const;
 
   public:
     //! Initialize a TCPSender
