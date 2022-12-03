@@ -151,8 +151,8 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
                 // If the window size is nonzero
                 // Holy shit
                 _RTO <<= 1;
+                _consecutive_retransmissions++;
             }
-            _consecutive_retransmissions++;
         }
         retry = true;
         _segments_out.push(it->first);

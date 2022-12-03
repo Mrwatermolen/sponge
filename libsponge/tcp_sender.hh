@@ -11,8 +11,6 @@
 #include <functional>
 #include <queue>
 
-enum class TCPSenderState { Closed, Listening, Receiving, CloseWait };
-
 //! \brief The "sender" part of a TCP implementation.
 
 //! Accepts a ByteStream, divides it up into segments and sends the
