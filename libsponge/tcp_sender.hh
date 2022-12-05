@@ -69,6 +69,11 @@ class TCPSender {
     //! \brief Generate an empty-payload segment (useful for creating empty ACK segments)
     void send_empty_segment();
 
+    /**
+     * @brief Generate an empty-payload segment with RST = true
+     */
+    void send_empty_segment_with_rst();
+
     //! \brief create and send segments to fill as much of the window as possible
     void fill_window();
 
@@ -103,6 +108,11 @@ class TCPSender {
     //! \brief relative seqno for the next byte to be sent
     WrappingInt32 next_seqno() const { return wrap(_next_seqno, _isn); }
     //!@}
+
+    /**
+     * @brief whether fin has been sent
+     */
+    bool sent_fin() const { return _send_fin; }
 };
 
 #endif  // SPONGE_LIBSPONGE_TCP_SENDER_HH

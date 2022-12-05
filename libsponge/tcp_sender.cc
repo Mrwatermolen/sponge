@@ -21,17 +21,13 @@ TCPSender::TCPSender(const size_t capacity, const uint16_t retx_timeout, const s
     : _isn(fixed_isn.value_or(WrappingInt32{random_device()()}))
     , _initial_retransmission_timeout{retx_timeout}
     , _RTO(_initial_retransmission_timeout)
-    , _stream(capacity) {
-    cout << "F:TCPSender() Start." << endl;
-    cur_state_to_srting();
-    cout << "F:TCPSender() End." << endl;
-}
+    , _stream(capacity) {}
 
 uint64_t TCPSender::bytes_in_flight() const { return _next_seqno - _last_ack_received; }
 
 void TCPSender::fill_window() {
     // by reading from the ByteStream, creating new TCP segments
-    cout << "F:fill_window() Start." << endl;
+    cout << "TCPSender::fill_window() Start." << endl;
     cur_state_to_srting();
     auto temp_size = _sender_window_size;
     if (_sender_window_size == 0) {
@@ -74,7 +70,7 @@ void TCPSender::fill_window() {
     if (_get_fin && !_send_fin) {
         if (temp_size <= _next_seqno - _last_ack_received) {
             cur_state_to_srting();
-            cout << "F:fill_window() End." << endl << endl;
+            cout << "TCPSender:fill_window() End." << endl << endl;
             return;
         }
         TCPSegment fin_seg;
@@ -86,13 +82,13 @@ void TCPSender::fill_window() {
         _out_backup.push_back(make_pair(fin_seg, _time_pass));
     }
     cur_state_to_srting();
-    cout << "F:fill_window() End." << endl << endl;
+    cout << "TCPSender::fill_window() End." << endl << endl;
 }
 
 //! \param ackno The remote receiver's ackno (acknowledgment number)
 //! \param window_size The remote receiver's advertised window size
 void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) {
-    cout << "F:ack_received() Start. ackno:" << ackno << ". window_size:" << window_size << endl;
+    cout << "TCPSender::ack_received() Start. ackno:" << ackno << ". window_size:" << window_size << endl;
     cur_state_to_srting();
 
     auto l = unwrap(ackno, _isn, _next_seqno);
@@ -122,12 +118,12 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
     }
 
     fill_window();
-    cout << "F:ack_received() End." << endl << endl;
+    cout << "TCPSender::ack_received() End." << endl << endl;
 }
 
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void TCPSender::tick(const size_t ms_since_last_tick) {
-    cout << "F:tick() Start." << ms_since_last_tick << endl;
+    cout << "TCPSender::tick() Start." << ms_since_last_tick << endl;
     _time_pass += ms_since_last_tick;
     bool retry = false;
     auto temp = _RTO;
@@ -159,15 +155,23 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
         it->second = _time_pass;
         cout << "Retry: " << it->first.header().summary() << endl;
     }
-    cout << "F:tick() End." << ms_since_last_tick << endl << endl;
+    cout << "TCPSender::tick() End." << ms_since_last_tick << endl << endl;
 }
 
 unsigned int TCPSender::consecutive_retransmissions() const { return _consecutive_retransmissions; }
 
 void TCPSender::send_empty_segment() {
-    cout << "F:send_empty_segment() Start." << endl;
+    cout << "TCPSender::send_empty_segment() Start." << endl;
     TCPSegment seg;
     seg.header().seqno = wrap(_next_seqno, _isn);
+    _segments_out.push(seg);
+    cout << "TCPSender::send_empty_segment() Start." << endl;
+}
+
+void TCPSender::send_empty_segment_with_rst() {
+    TCPSegment seg;
+    seg.header().seqno = wrap(_next_seqno, _isn);
+    seg.header().rst = true;
     _segments_out.push(seg);
 }
 
