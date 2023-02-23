@@ -22,7 +22,7 @@ StreamReassembler::StreamReassembler(const size_t capacity)
     , _capacity(capacity)
     , _reassembled_len(0)
     , _eof_index(-1)
-    , _unreassembled_data(map<size_t, std::string>()){};
+    , _unreassembled_data(map<size_t, std::string>()){}
 
 void StreamReassembler::meger_str(const string &data, const size_t index) {
     // [l, r)
