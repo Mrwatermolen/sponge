@@ -31,19 +31,21 @@ void TCPSender::fill_window() {
     cur_state_to_srting();
     auto temp_size = _sender_window_size;
     if (_sender_window_size == 0) {
-        // When filling window, treat a '0' window size as equal to '1' but don't back off RTO
-        // Why?
+        // When filling window, treat a '0' window size as equal to '1' but don't back off RTO。
+        // provoke the receiver into sending a new acknowledgment segment where it reveals that more space has opened up
+        // in its window. Without this, the sender would never learn that it was allowed to start sending again.
         temp_size = 1;
     }
 
     while (_next_seqno - _last_ack_received < temp_size && !_get_fin) {
         auto outstanding_bytes = _next_seqno - _last_ack_received;
         TCPSegment seg;
-        uint64_t nums = min(TCPConfig::MAX_PAYLOAD_SIZE, (temp_size - outstanding_bytes));
-        auto payload = Buffer(_stream.read(nums));
         if (!_next_seqno) {
             seg.header().syn = true;
+            ++outstanding_bytes;
         }
+        uint64_t nums = min(TCPConfig::MAX_PAYLOAD_SIZE, (temp_size - outstanding_bytes));
+        auto payload = Buffer(_stream.read(nums));
         if (_stream.eof()) {
             _get_fin = true;
         }
