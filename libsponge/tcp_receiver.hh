@@ -10,8 +10,6 @@
 #include <iostream>
 #include <optional>
 
-enum class TCPReceiverState { Listening, Receiving, CloseWait };
-
 //! \brief The "receiver" part of a TCP implementation.
 
 //! Receives and reassembles segments into a ByteStream, and computes
@@ -23,11 +21,8 @@ class TCPReceiver {
 
     //! The maximum number of bytes we'll store.
     size_t _capacity;
-    TCPReceiverState _state;
-    WrappingInt32 _isn;
-
-    void trans_receiving_state(const TCPSegment &seg);
-    void handle_payload(const TCPSegment &seg);
+    bool _syn_flag{false};
+    WrappingInt32 _isn{0};
 
   public:
     //! \brief Construct a TCP receiver
