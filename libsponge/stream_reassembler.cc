@@ -12,9 +12,6 @@
 
 // You will need to add private members to the class declaration in `stream_reassembler.hh`
 
-template <typename... Targs>
-void DUMMY_CODE(Targs &&.../* unused */) {}
-
 using namespace std;
 
 StreamReassembler::StreamReassembler(const size_t capacity)
@@ -22,7 +19,7 @@ StreamReassembler::StreamReassembler(const size_t capacity)
     , _capacity(capacity)
     , _reassembled_len(0)
     , _eof_index(-1)
-    , _unreassembled_data(map<size_t, std::string>()){}
+    , _unreassembled_data(map<size_t, std::string>()) {}
 
 void StreamReassembler::meger_str(const string &data, const size_t index) {
     // [l, r)
@@ -82,7 +79,6 @@ void StreamReassembler::write_data_to_byte_stream() {
 //! possibly out-of-order, from the logical stream, and assembles any newly
 //! contiguous substrings and writes them into the output stream in order.
 void StreamReassembler::push_substring(const string &data, const size_t index, const bool eof) {
-    DUMMY_CODE(data, index, eof);
     if (_eof_index == _reassembled_len) {
         return;
     }
@@ -105,17 +101,22 @@ void StreamReassembler::push_substring(const string &data, const size_t index, c
     }
 
     // flow control
-    size_t r = 0;
+    if ((_output.bytes_read() + _capacity) <= i) {
+        // outside
+        return;
+    }
+    size_t r{0};
     if (!_unreassembled_data.empty()) {
         auto last = _unreassembled_data.end();
         last--;
         r = last->first + last->second.size();
     }
+
     if (r < i + s.size()) {
         size_t unread_bytes = _reassembled_len - _output.bytes_read();
         size_t unreassembled_bytes = r - _reassembled_len;
         size_t total_space = unread_bytes + unreassembled_bytes + (i + s.size() - r);
-        if (total_space > _capacity) {
+        if (_capacity < total_space) {
             size_t remain = _capacity - (unread_bytes + unreassembled_bytes);
             s = s.substr(0, unreassembled_bytes + remain);
         }

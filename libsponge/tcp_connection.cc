@@ -1,5 +1,7 @@
 #include "tcp_connection.hh"
 
+#include "tcp_state.hh"
+
 #include <iostream>
 #include <limits>
 
@@ -7,9 +9,6 @@
 
 // For Lab 4, please replace with a real implementation that passes the
 // automated checks run by `make check`.
-
-template <typename... Targs>
-void DUMMY_CODE(Targs &&.../* unused */) {}
 
 using namespace std;
 
@@ -22,109 +21,104 @@ size_t TCPConnection::unassembled_bytes() const { return _receiver.unassembled_b
 size_t TCPConnection::time_since_last_segment_received() const { return _time_pass - _last_received_time; }
 
 void TCPConnection::segment_received(const TCPSegment &seg) {
-    cout << "TCPConnection::segment_received() Start." << endl;
-    if (!_had_tried) {
-        _actived = true;
-        _had_tried = true;
-    }
+    // cout << "TCPConnection::segment_received() Start." << endl;
     const TCPHeader &header = seg.header();
-    // cout << "T:" << header.summary() << endl << seg.length_in_sequence_space() << endl << endl;
-    if (header.rst) {
-        abort_connection();
-        return;
-    }
-
     // Receiving
     _receiver.segment_received(seg);
-    auto ackno = _receiver.ackno();
-    if (!ackno.has_value()) {
-        // illegal seg
+
+    if (header.rst) {
+        abort_connection(false);
         return;
     }
-    _last_received_time = _time_pass;
 
+    _last_received_time = _time_pass;
     // Sending
-    _sender.ack_received(ackno.value(), header.win);
-    if (seg.length_in_sequence_space() && _sender.segments_out().empty()) {
-        // keep-alives
-        _sender.send_empty_segment();
-        // send_seg();
+    if (header.ack) {
+        _sender.ack_received(header.ackno, header.win);
     }
+    // cout << TCPState::state_summary(_receiver) << endl;
+    // cout << TCPState::state_summary(_sender) << endl;
+
+    if (TCPState::state_summary(_receiver) == TCPReceiverStateSummary::SYN_RECV &&
+        TCPState::state_summary(_sender) == TCPSenderStateSummary::CLOSED) {
+        connect();
+        return;
+    }
+
+    // if (!_receiver.ackno().has_value()) {
+    //     return;
+    // }
+
+    if (TCPState::state_summary(_receiver) == TCPReceiverStateSummary::FIN_RECV &&
+        TCPState::state_summary(_sender) == TCPSenderStateSummary::SYN_ACKED) {
+        _linger_after_streams_finish = false;
+    }
+
+    if (!_linger_after_streams_finish && TCPState::state_summary(_receiver) == TCPReceiverStateSummary::FIN_RECV &&
+        TCPState::state_summary(_sender) == TCPSenderStateSummary::FIN_ACKED) {
+        _actived = false;
+        return;
+    }
+
+    // if (seg.length_in_sequence_space() == 0 && _receiver.ackno().value() - 1 == seg.header().seqno) {
+    //     // keep-alives
+    //     _sender.send_empty_segment();
+    //     send_seg();
+    //     return;
+    // }
+
+    if (seg.length_in_sequence_space() && _sender.segments_out().empty()) {
+        _sender.send_empty_segment();
+    }
+
     send_seg();
-    cout << "TCPConnection::segment_received() End." << endl;
-    cout << endl;
+    // cout << "TCPConnection::segment_received() End." << endl;
 }
 
 bool TCPConnection::active() const { return _actived; }
 
-size_t TCPConnection::write(const string &data) { return _sender.stream_in().write(data); }
+size_t TCPConnection::write(const string &data) {
+    auto size{_sender.stream_in().write(data)};
+    _sender.fill_window();
+    send_seg();
+    return size;
+}
 
 //! \param[in] ms_since_last_tick number of milliseconds since the last call to this method
 void TCPConnection::tick(const size_t ms_since_last_tick) {
-    cout << "TCPConnection::tick() Start." << endl;
-    cur_state();
+    // cout << "TCPConnection::tick() Start." << endl;
     _time_pass += ms_since_last_tick;
     _sender.tick(ms_since_last_tick);
-    uint64_t expire_time = _last_received_time + 10 * _cfg.rt_timeout;
+   
 
     if (_cfg.MAX_RETX_ATTEMPTS < _sender.consecutive_retransmissions()) {
-        _sender.fill_window();
-        send_seg();
-        abort_connection();
-        cout << "TCPConnection::tick() End." << endl;
-        cout << endl;
+        // cout << "TCPConnection::tick() abort_connection();" << endl;
+        abort_connection(true);
+        // cout << "TCPConnection::tick() End." << endl;
         return;
     }
 
-    bool prereq_1 = _receiver.unassembled_bytes() == 0 &&
-                    _receiver.stream_out().eof();  // The inbound stream has been fully assembled and has ended.
+    send_seg();
 
-    bool prereq_2 = _sender.sent_fin();
-    bool prereq_3 =
-        _sender.bytes_in_flight() == 0;  // The outbound stream has been fully acknowledged by the remote peer.
-    if (prereq_2) {
-        _linger_after_streams_finish = false;
-    }
+    try_active_close();
 
-    if (!_linger_after_streams_finish && prereq_1 && prereq_3) {
-        _actived = false;
-        cur_state();
-        cout << "TCPConnection::tick() End." << endl;
-        cout << endl;
-        return;
-    }
-
-    if (!prereq_1 || !prereq_3 || _time_pass < expire_time) {
-        cur_state();
-        cout << "TCPConnection::tick() End." << endl;
-        cout << endl;
-        return;
-    }
-
-    _actived = false;
-    cout << "TCPConnection::tick() End." << endl;
-    cout << endl;
+    // cout << "TCPConnection::tick() End." << endl;
 }
 
 void TCPConnection::end_input_stream() {
-    cout << "TCPConnection::end_input_stream() Start." << endl;
+    // cout << "TCPConnection::end_input_stream() Start." << endl;
     _sender.stream_in().end_input();
     _sender.fill_window();
     send_seg();
-    cout << "TCPConnection::end_input_stream() End." << endl;
-    cout << endl;
+    // cout << "TCPConnection::end_input_stream() End." << endl;
 }
 
 void TCPConnection::connect() {
-    cout << "TCPConnection::connect() Start." << endl;
-    if (!_had_tried) {
-        _actived = true;
-        _had_tried = true;
-    }
+    // cout << "TCPConnection::connect() Start." << endl;
+    _actived = true;
     _sender.fill_window();
     send_seg();
-    cout << "TCPConnection::connect() End." << endl;
-    cout << endl;
+    // cout << "TCPConnection::connect() End." << endl;
 }
 
 TCPConnection::~TCPConnection() {
@@ -133,32 +127,34 @@ TCPConnection::~TCPConnection() {
             cerr << "Warning: Unclean shutdown of TCPConnection\n";
 
             // Your code here: need to send a RST segment to the peer
-            abort_connection();
+            abort_connection(false);
         }
     } catch (const exception &e) {
         std::cerr << "Exception destructing TCP FSM: " << e.what() << std::endl;
     }
 }
 
-void TCPConnection::abort_connection() {
-    cout << "TCPConnection::abort_connection() Start." << endl;
-    cur_state();
-    _sender.send_empty_segment_with_rst();
-    send_seg();
-    _sender.stream_in().error();
-    _receiver.stream_out().error();
+void TCPConnection::abort_connection(bool send_rst) {
+    // cout << "TCPConnection::abort_connection() Start." << endl;
+    while (!_sender.segments_out().empty()) {
+        _sender.segments_out().pop();
+    }
+    _sender.stream_in().set_error();
+    _receiver.stream_out().set_error();
     _actived = false;
-    cout << "TCPConnection::abort_connection() End." << endl;
-    cout << endl;
+    if (send_rst) {
+        _sender.send_empty_segment_with_rst();
+        send_seg(); //_segments_out.push(seg);
+    }
+    // cout << "TCPConnection::abort_connection() End." << endl;
 }
 
 void TCPConnection::send_seg() {
-    cout << "TCPConnection::send_seg() Start." << endl;
-    cur_state();
+    // cout << "TCPConnection::send_seg() Start." << endl;
+    // cout << TCPState::state_summary(_receiver) << endl << TCPState::state_summary(_sender) << endl;
     while (!_sender.segments_out().empty()) {
         TCPSegment seg = _sender.segments_out().front();
         if (_receiver.ackno().has_value()) {
-            // cout << _receiver.ackno().value() << endl;
             seg.header().ackno = _receiver.ackno().value();
             if (std::numeric_limits<uint16_t>::max() < _receiver.window_size()) {
                 seg.header().win = std::numeric_limits<uint16_t>::max();
@@ -170,21 +166,30 @@ void TCPConnection::send_seg() {
 
         _segments_out.push(seg);
         _sender.segments_out().pop();
-        cout << seg.header().summary() << endl;
+        // cout << seg.header().summary() << endl;
     }
-    cout << "TCPConnection::send_seg() End." << endl;
+    // cout << "TCPConnection::send_seg() End." << endl;
 }
 
-void TCPConnection::cur_state() {
-    TCPSegment seg;
-    if (_receiver.ackno().has_value()) {
-        seg.header().ackno = _receiver.ackno().value();
+void TCPConnection::try_active_close() {
+    auto expire_time{_last_received_time + 10 * _cfg.rt_timeout};
+    // cout << "TCPConnection::try_active_close() time pass:" << _time_pass
+    //  << ". _sender.bytes_in_flight():" << _sender.bytes_in_flight() << endl;
+    if (!_linger_after_streams_finish) {
+        return;
     }
-    seg.header().fin = _sender.sent_fin();
-    seg.header().seqno = _sender.next_seqno();
+    // check pre #1: The inbound stream has been fully assembled and has ended.
+    // check pre #3: The outbound stream has been fully acknowledged by the remote peer.
 
-    cout << "Currant State:"
-         << "linger: " << _linger_after_streams_finish << ". actived: " << _actived
-         << ". segments_out: " << _segments_out.size() << ". " << seg.header().summary() << ". time pass:" << _time_pass
-         << endl;
+    if (TCPState::state_summary(_receiver) != TCPReceiverStateSummary::FIN_RECV ||
+        TCPState::state_summary(_sender) != TCPSenderStateSummary::FIN_ACKED) {
+        return;
+    }
+
+    // cout << "TCPConnection::try_active_close() time pass:" << _time_pass << ". expire_time:" << expire_time << endl;
+    if (_time_pass < expire_time) {
+        return;
+    }
+
+    _actived = false;
 }
