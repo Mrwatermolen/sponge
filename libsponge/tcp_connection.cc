@@ -1,8 +1,5 @@
 #include "tcp_connection.hh"
 
-#include "tcp_state.hh"
-
-#include <iostream>
 #include <limits>
 
 // Dummy implementation of a TCP connection
@@ -21,26 +18,28 @@ size_t TCPConnection::unassembled_bytes() const { return _receiver.unassembled_b
 size_t TCPConnection::time_since_last_segment_received() const { return _time_pass - _last_received_time; }
 
 void TCPConnection::segment_received(const TCPSegment &seg) {
-    // cout << "TCPConnection::segment_received() Start." << endl;
-    const TCPHeader &header = seg.header();
+    const TCPHeader &header{seg.header()};
     // Receiving
     _receiver.segment_received(seg);
 
+    // Flag rst is ingored when the state of reciever is LISTEN.
+    // So check flag rst after receiving.
     if (header.rst) {
+        // dosen't need to send seg with flag rst.
         abort_connection(false);
         return;
     }
 
     _last_received_time = _time_pass;
+
     // Sending
     if (header.ack) {
         _sender.ack_received(header.ackno, header.win);
     }
-    // cout << TCPState::state_summary(_receiver) << endl;
-    // cout << TCPState::state_summary(_sender) << endl;
 
     if (TCPState::state_summary(_receiver) == TCPReceiverStateSummary::SYN_RECV &&
         TCPState::state_summary(_sender) == TCPSenderStateSummary::CLOSED) {
+        // Send SYN and ACK
         connect();
         return;
     }
@@ -51,11 +50,15 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
 
     if (TCPState::state_summary(_receiver) == TCPReceiverStateSummary::FIN_RECV &&
         TCPState::state_summary(_sender) == TCPSenderStateSummary::SYN_ACKED) {
+        // The TCPConnection’s inbound stream ends before the TCPConnection has ever sent a fin segment.
+        // doesn’t need to linger after both streams finish.
         _linger_after_streams_finish = false;
     }
 
+    // check if both streams finish when linger is false.
     if (!_linger_after_streams_finish && TCPState::state_summary(_receiver) == TCPReceiverStateSummary::FIN_RECV &&
         TCPState::state_summary(_sender) == TCPSenderStateSummary::FIN_ACKED) {
+        // passive close.
         _actived = false;
         return;
     }
@@ -68,11 +71,11 @@ void TCPConnection::segment_received(const TCPSegment &seg) {
     // }
 
     if (seg.length_in_sequence_space() && _sender.segments_out().empty()) {
+        // send a seg to keep alives.
         _sender.send_empty_segment();
     }
 
     send_seg();
-    // cout << "TCPConnection::segment_received() End." << endl;
 }
 
 bool TCPConnection::active() const { return _actived; }
@@ -86,39 +89,30 @@ size_t TCPConnection::write(const string &data) {
 
 //! \param[in] ms_since_last_tick number of milliseconds since the last call to this method
 void TCPConnection::tick(const size_t ms_since_last_tick) {
-    // cout << "TCPConnection::tick() Start." << endl;
     _time_pass += ms_since_last_tick;
     _sender.tick(ms_since_last_tick);
-   
 
     if (_cfg.MAX_RETX_ATTEMPTS < _sender.consecutive_retransmissions()) {
-        // cout << "TCPConnection::tick() abort_connection();" << endl;
+        // need to send seg with flag rst
         abort_connection(true);
-        // cout << "TCPConnection::tick() End." << endl;
         return;
     }
 
     send_seg();
 
     try_active_close();
-
-    // cout << "TCPConnection::tick() End." << endl;
 }
 
 void TCPConnection::end_input_stream() {
-    // cout << "TCPConnection::end_input_stream() Start." << endl;
     _sender.stream_in().end_input();
     _sender.fill_window();
     send_seg();
-    // cout << "TCPConnection::end_input_stream() End." << endl;
 }
 
 void TCPConnection::connect() {
-    // cout << "TCPConnection::connect() Start." << endl;
     _actived = true;
     _sender.fill_window();
     send_seg();
-    // cout << "TCPConnection::connect() End." << endl;
 }
 
 TCPConnection::~TCPConnection() {
@@ -127,6 +121,8 @@ TCPConnection::~TCPConnection() {
             cerr << "Warning: Unclean shutdown of TCPConnection\n";
 
             // Your code here: need to send a RST segment to the peer
+            // ? need to send a RST segment ?
+            // Test say NO
             abort_connection(false);
         }
     } catch (const exception &e) {
@@ -135,7 +131,6 @@ TCPConnection::~TCPConnection() {
 }
 
 void TCPConnection::abort_connection(bool send_rst) {
-    // cout << "TCPConnection::abort_connection() Start." << endl;
     while (!_sender.segments_out().empty()) {
         _sender.segments_out().pop();
     }
@@ -144,14 +139,11 @@ void TCPConnection::abort_connection(bool send_rst) {
     _actived = false;
     if (send_rst) {
         _sender.send_empty_segment_with_rst();
-        send_seg(); //_segments_out.push(seg);
+        send_seg();
     }
-    // cout << "TCPConnection::abort_connection() End." << endl;
 }
 
 void TCPConnection::send_seg() {
-    // cout << "TCPConnection::send_seg() Start." << endl;
-    // cout << TCPState::state_summary(_receiver) << endl << TCPState::state_summary(_sender) << endl;
     while (!_sender.segments_out().empty()) {
         TCPSegment seg = _sender.segments_out().front();
         if (_receiver.ackno().has_value()) {
@@ -166,15 +158,10 @@ void TCPConnection::send_seg() {
 
         _segments_out.push(seg);
         _sender.segments_out().pop();
-        // cout << seg.header().summary() << endl;
     }
-    // cout << "TCPConnection::send_seg() End." << endl;
 }
 
 void TCPConnection::try_active_close() {
-    auto expire_time{_last_received_time + 10 * _cfg.rt_timeout};
-    // cout << "TCPConnection::try_active_close() time pass:" << _time_pass
-    //  << ". _sender.bytes_in_flight():" << _sender.bytes_in_flight() << endl;
     if (!_linger_after_streams_finish) {
         return;
     }
@@ -186,7 +173,8 @@ void TCPConnection::try_active_close() {
         return;
     }
 
-    // cout << "TCPConnection::try_active_close() time pass:" << _time_pass << ". expire_time:" << expire_time << endl;
+    auto expire_time{_last_received_time + 10 * _cfg.rt_timeout};
+
     if (_time_pass < expire_time) {
         return;
     }

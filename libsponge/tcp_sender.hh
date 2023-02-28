@@ -42,12 +42,6 @@ class TCPSender {
     bool _get_fin{false};
     bool _send_fin{false};
 
-    /**
-     * @brief For Debug.
-     *
-     */
-    void cur_state_to_srting() const;
-
   public:
     //! Initialize a TCPSender
     TCPSender(const size_t capacity = TCPConfig::DEFAULT_CAPACITY,

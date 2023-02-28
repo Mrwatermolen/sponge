@@ -60,7 +60,7 @@ void TCPSender::fill_window() {
                 _send_fin = true;
             }
         }
-        
+
         if (!seg.length_in_sequence_space()) {
             break;
         }
@@ -70,7 +70,6 @@ void TCPSender::fill_window() {
 
     if (_get_fin && !_send_fin) {
         if (temp_size <= _next_seqno - _last_ack_received) {
-            cur_state_to_srting();
             return;
         }
         TCPSegment fin_seg;
@@ -81,14 +80,11 @@ void TCPSender::fill_window() {
         _segments_out.push(fin_seg);
         _out_backup.push_back(make_pair(fin_seg, _time_pass));
     }
-    cur_state_to_srting();
 }
 
 //! \param ackno The remote receiver's ackno (acknowledgment number)
 //! \param window_size The remote receiver's advertised window size
 void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_size) {
-    cur_state_to_srting();
-
     auto l = unwrap(ackno, _isn, _next_seqno);
     if (_next_seqno < l) {
         return;
@@ -155,13 +151,4 @@ void TCPSender::send_empty_segment_with_rst() {
     seg.header().seqno = wrap(_next_seqno, _isn);
     seg.header().rst = true;
     _segments_out.push(seg);
-}
-
-void TCPSender::cur_state_to_srting() const {
-    // cout << "Currant State:"
-    //      << " _isn: " << _isn << ". segments_queue.size: " << _segments_out.size()
-    //      << ". _stream.buffer_size:" << _stream.buffer_size() << ". _next_seqno:" << _next_seqno
-    //      << ". LAR:" << _last_ack_received << ". SWS:" << _sender_window_size
-    //      << ". outing_queue: " << _out_backup.size() << ". timepass:" << _time_pass << ". eof:" << _stream.eof()
-    //      << endl;
 }
