@@ -23,13 +23,10 @@ class TCPConnection {
 
     uint64_t _time_pass{0};
     uint64_t _last_received_time{0};
-
     bool _actived{true};  // initialize to true!!!!
 
-    // \brief sets both the inbound and outbound streams to the error state and kills the connection permanently.
     void abort_connection(bool send_rst);
     void send_seg();
-    void try_active_close();
 
   public:
     //! \name "Input" interface for the writer

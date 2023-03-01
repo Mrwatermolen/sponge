@@ -27,7 +27,7 @@ uint64_t TCPSender::bytes_in_flight() const { return _next_seqno - _last_ack_rec
 
 void TCPSender::fill_window() {
     // by reading from the ByteStream, creating new TCP segments
-    auto temp_size = _sender_window_size;
+    auto temp_size{_sender_window_size};
     if (_sender_window_size == 0) {
         // When filling window, treat a '0' window size as equal to '1' but don't back off RTO。
         // provoke the receiver into sending a new acknowledgment segment where it reveals that more space has opened up
@@ -43,7 +43,7 @@ void TCPSender::fill_window() {
             ++outstanding_bytes;
         }
         uint64_t nums = min(TCPConfig::MAX_PAYLOAD_SIZE, (temp_size - outstanding_bytes));
-        auto payload = Buffer(_stream.read(nums));
+        auto payload{Buffer(_stream.read(nums))};
         if (_stream.eof()) {
             _get_fin = true;
         }
@@ -96,10 +96,10 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
     _last_ack_received = l;
     _consecutive_retransmissions = 0;
     _RTO = _initial_retransmission_timeout;
-    for (auto it = _out_backup.begin(); it != _out_backup.end(); it++) {
-        if (l <= unwrap(it->first.header().seqno, _isn, _next_seqno) + it->first.length_in_sequence_space() - 1) {
+    for(auto &&i:_out_backup) {
+        if (l <= unwrap(i.first.header().seqno, _isn, _next_seqno) + i.first.length_in_sequence_space() - 1) {
             // restart the retransmission timer
-            it->second = _time_pass;
+            i.second = _time_pass;
             continue;
         }
         _out_backup.pop_front();
@@ -111,20 +111,16 @@ void TCPSender::ack_received(const WrappingInt32 ackno, const uint16_t window_si
 //! \param[in] ms_since_last_tick the number of milliseconds since the last call to this method
 void TCPSender::tick(const size_t ms_since_last_tick) {
     _time_pass += ms_since_last_tick;
-    bool retry = false;
-    auto temp = _RTO;
-    for (auto it = _out_backup.begin(); it != _out_backup.end(); ++it) {
+    auto retry{false};
+    auto temp{_RTO};
+    for (auto &&i:_out_backup) {
         if (retry) {
-            it->second = _time_pass;
+            i.second = _time_pass;
         }
-        if (_time_pass < it->second + temp) {
+        if (_time_pass < i.second + temp) {
             continue;
         }
         if (!retry) {
-            // if (_next_seqno - _last_ack_received <= _sender_window_size) {
-            //     // If the window size is nonzero
-            //     _RTO <<= 1;
-            // }
             if (_sender_window_size) {
                 // If the window size is nonzero
                 // Holy shit
@@ -133,8 +129,8 @@ void TCPSender::tick(const size_t ms_since_last_tick) {
             }
         }
         retry = true;
-        _segments_out.push(it->first);
-        it->second = _time_pass;
+        _segments_out.push(i.first);
+        i.second = _time_pass;
     }
 }
 
@@ -148,7 +144,6 @@ void TCPSender::send_empty_segment() {
 
 void TCPSender::send_empty_segment_with_rst() {
     TCPSegment seg;
-    seg.header().seqno = wrap(_next_seqno, _isn);
     seg.header().rst = true;
     _segments_out.push(seg);
 }
