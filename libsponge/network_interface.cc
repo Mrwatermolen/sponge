@@ -32,8 +32,8 @@ NetworkInterface::NetworkInterface(const EthernetAddress &ethernet_address, cons
 void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Address &next_hop) {
     // convert IP address of next hop to raw 32-bit representation (used in ARP header)
     const uint32_t next_hop_ip = next_hop.ipv4_numeric();
-    cout << "NetworkInterface::send_datagram() Start" << endl;
-    cout << "NetworkInterface::send_datagram() next_hop:" << next_hop << endl;
+    // cout << "NetworkInterface::send_datagram() Start" << endl;
+    // cout << "NetworkInterface::send_datagram() next_hop:" << next_hop << endl;
     if (!_address_cache.count(next_hop_ip)) {
         // call ARP
         broadcastReqeustARP(next_hop_ip);
@@ -44,7 +44,7 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
         }
 
         _unkonw_ip_datagarm.find(next_hop_ip)->second.emplace(dgram);
-        cout << "NetworkInterface::send_datagram() End" << endl;
+        // cout << "NetworkInterface::send_datagram() End" << endl;
         return;
     }
 
@@ -56,44 +56,44 @@ void NetworkInterface::send_datagram(const InternetDatagram &dgram, const Addres
     header.dst = ehter_dst;
     frame.payload() = dgram.serialize();
     _frames_out.emplace(frame);
-    cout << "NetworkInterface::send_datagram() End" << endl;
+    // cout << "NetworkInterface::send_datagram() End" << endl;
 }
 
 //! \param[in] frame the incoming Ethernet frame
 optional<InternetDatagram> NetworkInterface::recv_frame(const EthernetFrame &frame) {
     auto header{frame.header()};
-    cout << "NetworkInterface::recv_frame() Start" << endl;
-    cout << "NetworkInterface::recv_frame() frame header:" << header.to_string() << endl;
+    // cout << "NetworkInterface::recv_frame() Start" << endl;
+    // cout << "NetworkInterface::recv_frame() frame header:" << header.to_string() << endl;
     if (header.dst != ETHERNET_BROADCAST && header.dst != _ethernet_address) {
-        cout << "NetworkInterface::recv_frame() wrong dsc End" << header.to_string() << endl;
+        // cout << "NetworkInterface::recv_frame() wrong dsc End" << header.to_string() << endl;
         return {};
     }
     if (header.type == EthernetHeader::TYPE_IPv4) {
-        cout << "NetworkInterface::recv_frame() TYPE_IPv4" << endl;
+        // cout << "NetworkInterface::recv_frame() TYPE_IPv4" << endl;
         auto datagram{InternetDatagram{}};
         if (datagram.parse(frame.payload()) != ParseResult::NoError) {
-            cout << "NetworkInterface::recv_frame() Parse Error End" << endl;
+            // cout << "NetworkInterface::recv_frame() Parse Error End" << endl;
             return {};
         }
 
-        cout << "NetworkInterface::recv_frame() End" << endl;
+        // cout << "NetworkInterface::recv_frame() End" << endl;
         return datagram;
     }
     if (header.type == EthernetHeader::TYPE_ARP) {
-        cout << "NetworkInterface::recv_frame() TYPE_ARP" << endl;
+        // cout << "NetworkInterface::recv_frame() TYPE_ARP" << endl;
         // auto arp_mes{APRMessage{}};
         auto mes{ARPMessage{}};
         if (mes.parse(frame.payload()) != ParseResult::NoError) {
-            cout << "NetworkInterface::recv_frame() APRMessage Error" << endl;
-            cout << "NetworkInterface::recv_frame() End" << endl;
+            // cout << "NetworkInterface::recv_frame() APRMessage Error" << endl;
+            // cout << "NetworkInterface::recv_frame() End" << endl;
             return {};
         }
-        cout << "NetworkInterface::recv_frame() APRMessage:" << mes.to_string() << endl;
+        // cout << "NetworkInterface::recv_frame() APRMessage:" << mes.to_string() << endl;
         learnMappingFromARP(mes);
-        cout << "NetworkInterface::recv_frame() End" << endl;
+        // cout << "NetworkInterface::recv_frame() End" << endl;
         return {};
     }
-    cout << "NetworkInterface::recv_frame() End" << endl;
+    // cout << "NetworkInterface::recv_frame() End" << endl;
     return {};
 }
 
@@ -121,7 +121,7 @@ void NetworkInterface::tick(const size_t ms_since_last_tick) {
 }
 
 void NetworkInterface::broadcastReqeustARP(const uint32_t &ip) {
-    cout << "NetworkInterface::broadcastReqeustARP() Start" << endl;
+    // cout << "NetworkInterface::broadcastReqeustARP() Start" << endl;
     if (_ARP_request_cache.count(ip)) {
         return;
     }
@@ -139,15 +139,15 @@ void NetworkInterface::broadcastReqeustARP(const uint32_t &ip) {
     _frames_out.emplace(frame);
 
     _ARP_request_cache.emplace(make_pair(ip, _time_pass + 5000));
-    cout << "NetworkInterface::broadcastReqeustARP() ARP mes:" << mes.to_string() << endl;
-    cout << "NetworkInterface::broadcastReqeustARP() ehternet frame:" << frame.header().to_string() << endl;
-    cout << "NetworkInterface::broadcastReqeustARP() End" << endl;
+    // cout << "NetworkInterface::broadcastReqeustARP() ARP mes:" << mes.to_string() << endl;
+    // cout << "NetworkInterface::broadcastReqeustARP() ehternet frame:" << frame.header().to_string() << endl;
+    // cout << "NetworkInterface::broadcastReqeustARP() End" << endl;
 }
 
 void NetworkInterface::learnMappingFromARP(const ARPMessage &mes) {
-    cout << "NetworkInterface::learnMappingFromARP()  mes:" << mes.to_string() << endl;
+    // cout << "NetworkInterface::learnMappingFromARP()  mes:" << mes.to_string() << endl;
     if (mes.opcode == ARPMessage::OPCODE_REQUEST && mes.target_ip_address == _ip_address.ipv4_numeric()) {
-        cout << "NetworkInterface::learnMappingFromARP() reply" << endl;
+        // cout << "NetworkInterface::learnMappingFromARP() reply" << endl;
         auto reply_msg{ARPMessage()};
         reply_msg.opcode = ARPMessage::OPCODE_REPLY;
         reply_msg.sender_ethernet_address = _ethernet_address;
@@ -160,11 +160,11 @@ void NetworkInterface::learnMappingFromARP(const ARPMessage &mes) {
         frame.header().dst = mes.sender_ethernet_address;
         frame.payload() = reply_msg.serialize();
         _frames_out.emplace(frame);
-        cout << "NetworkInterface::learnMappingFromARP() reply frame:" << frame.header().to_string() << endl;
+        // cout << "NetworkInterface::learnMappingFromARP() reply frame:" << frame.header().to_string() << endl;
     }
 
     if (!_address_cache.count(mes.sender_ip_address)) {
-        cout << "NetworkInterface::learnMappingFromARP() make_pair" << endl;
+        // cout << "NetworkInterface::learnMappingFromARP() make_pair" << endl;
         auto ethernet_timer{EhternetAdressTimer{mes.sender_ethernet_address, _time_pass + 30000}};
         _address_cache.emplace(make_pair(mes.sender_ip_address, ethernet_timer));
     }
@@ -174,11 +174,11 @@ void NetworkInterface::learnMappingFromARP(const ARPMessage &mes) {
     entry->second.expire_time = _time_pass + 30000;
     if (!_unkonw_ip_datagarm.count(mes.sender_ip_address) ||
         _unkonw_ip_datagarm.find(mes.sender_ip_address)->second.empty()) {
-        cout << "NetworkInterface::learnMappingFromARP() clean End" << endl;
+        // cout << "NetworkInterface::learnMappingFromARP() clean End" << endl;
         return;
     }
 
-    cout << "NetworkInterface::learnMappingFromARP(). Try" << endl;
+    // cout << "NetworkInterface::learnMappingFromARP(). Try" << endl;
 
     while (!_unkonw_ip_datagarm.find(mes.sender_ip_address)->second.empty()) {
         auto ehter_dst{mes.sender_ethernet_address};
@@ -189,10 +189,10 @@ void NetworkInterface::learnMappingFromARP(const ARPMessage &mes) {
         header.dst = ehter_dst;
         frame.payload() = _unkonw_ip_datagarm.find(mes.sender_ip_address)->second.front().serialize();
         _unkonw_ip_datagarm.find(mes.sender_ip_address)->second.pop();
-        cout << "NetworkInterface::learnMappingFromARP() REPLY. send frame:" << header.to_string() << endl;
+        // cout << "NetworkInterface::learnMappingFromARP() REPLY. send frame:" << header.to_string() << endl;
         _frames_out.emplace(frame);
     }
     _unkonw_ip_datagarm.erase(_unkonw_ip_datagarm.find(mes.sender_ip_address));
-    cout << "NetworkInterface::learnMappingFromARP() End" << endl;
+    // cout << "NetworkInterface::learnMappingFromARP() End" << endl;
     return;
 }
